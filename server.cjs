@@ -3,6 +3,7 @@ const cors = require("cors")
 const fs = require("fs")
 const path = require("path")
 const archiver = require("archiver")
+const os = require("os")
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -20,15 +21,6 @@ app.get("/test", (req, res) => {
   res.json({
     status: "ok",
     message: "TEST WORKS 🚀"
-  })
-})
-
-// ---------------- BASIC AI ----------------
-app.post("/generate", (req, res) => {
-  const { prompt } = req.body
-
-  res.json({
-    result: `AI Idea for: ${prompt}`
   })
 })
 
@@ -63,15 +55,17 @@ public class GameManager : MonoBehaviour {
   })
 })
 
-// ---------------- ZIP DOWNLOAD (OPTIONAL NEXT STEP) ----------------
+// ---------------- ZIP DOWNLOAD (FULL WORKING) ----------------
 app.post("/download-unity-zip", (req, res) => {
   const { prompt } = req.body
 
-  const tempDir = path.join(__dirname, "tempProject")
+  // unique temp folder (important for Render)
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "unity-"))
   const assetsDir = path.join(tempDir, "Assets")
 
   fs.mkdirSync(assetsDir, { recursive: true })
 
+  // Unity files
   const playerScript = `
 using UnityEngine;
 
@@ -95,12 +89,19 @@ public class GameManager : MonoBehaviour {
   fs.writeFileSync(path.join(assetsDir, "PlayerController.cs"), playerScript)
   fs.writeFileSync(path.join(assetsDir, "GameManager.cs"), gameManager)
 
-  const zipPath = path.join(__dirname, "unity-project.zip")
+  const zipPath = path.join(tempDir, "unity-project.zip")
   const output = fs.createWriteStream(zipPath)
-  const archive = archiver("zip")
+  const archive = archiver("zip", { zlib: { level: 9 } })
 
   output.on("close", () => {
-    res.download(zipPath)
+    res.download(zipPath, "unity-project.zip", () => {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    })
+  })
+
+  archive.on("error", (err) => {
+    console.error(err)
+    res.status(500).send("ZIP creation failed")
   })
 
   archive.pipe(output)

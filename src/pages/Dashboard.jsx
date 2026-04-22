@@ -7,11 +7,9 @@ export default function Dashboard() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // ---------------- GENERATE UNITY FILES ----------------
   const handleGenerate = async () => {
-    if (!userInput.trim()) return
-
     setLoading(true)
-    setResult(null)
 
     try {
       const res = await fetch(`${API_URL}/generate-unity`, {
@@ -24,80 +22,80 @@ export default function Dashboard() {
         })
       })
 
-      // 🚨 check backend errors properly
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`)
-      }
-
       const data = await res.json()
-      console.log("Backend response:", data)
-
       setResult(data)
     } catch (err) {
-      console.error("Error calling backend:", err)
-      setResult({
-        error: "Backend connection failed. Check Render URL or route."
-      })
+      setResult({ error: "Generation failed" })
     }
 
     setLoading(false)
   }
 
+  // ---------------- DOWNLOAD ZIP ----------------
+  const downloadZip = async () => {
+    try {
+      const res = await fetch(`${API_URL}/download-unity-zip`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prompt: userInput
+        })
+      })
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "unity-project.zip"
+      a.click()
+
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("ZIP download failed:", err)
+    }
+  }
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+    <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h1>Unity AI Generator 🚀</h1>
 
       <textarea
+        rows={5}
+        style={{ width: "100%", marginTop: 10 }}
+        placeholder="Describe your game..."
         value={userInput}
         onChange={(e) => setUserInput(e.target.value)}
-        placeholder="Describe your game..."
-        rows={6}
-        style={{
-          width: "100%",
-          marginTop: "10px",
-          padding: "10px"
-        }}
       />
 
-      <button
-        onClick={handleGenerate}
-        style={{
-          marginTop: "10px",
-          padding: "10px 20px",
-          cursor: "pointer"
-        }}
-      >
-        {loading ? "Generating..." : "Generate Unity Project"}
-      </button>
+      <div style={{ marginTop: 10 }}>
+        <button onClick={handleGenerate}>
+          {loading ? "Generating..." : "Generate Unity Code"}
+        </button>
 
-      {/* RESULT SECTION */}
+        <button onClick={downloadZip} style={{ marginLeft: 10 }}>
+          Download ZIP 📦
+        </button>
+      </div>
+
+      {/* RESULTS */}
       {result && (
-        <div style={{ marginTop: "20px" }}>
-          <h2>Result:</h2>
+        <div style={{ marginTop: 20 }}>
+          <h2>Result</h2>
 
-          {result.error && (
-            <p style={{ color: "red" }}>{result.error}</p>
-          )}
+          {result.files &&
+            result.files.map((file, i) => (
+              <div key={i} style={{ marginBottom: 15 }}>
+                <h3>{file.name}</h3>
+                <pre style={{ background: "#111", color: "#0f0", padding: 10 }}>
+                  {file.content}
+                </pre>
+              </div>
+            ))}
 
-          {result.files?.map((file, index) => (
-            <div key={index} style={{ marginBottom: "15px" }}>
-              <h3>{file.name}</h3>
-              <pre
-                style={{
-                  background: "#111",
-                  color: "#0f0",
-                  padding: "10px",
-                  overflowX: "auto"
-                }}
-              >
-                {file.content}
-              </pre>
-            </div>
-          ))}
-
-          {!result.files && !result.error && (
-            <pre>{JSON.stringify(result, null, 2)}</pre>
-          )}
+          {result.error && <p style={{ color: "red" }}>{result.error}</p>}
         </div>
       )}
     </div>
