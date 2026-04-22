@@ -1,101 +1,71 @@
 import { useState } from "react"
 
-const API_URL = "https://ai-site-atz0.onrender.com"
+const API = "https://ai-site-atz0.onrender.com"
 
 export default function Dashboard() {
-  const [userInput, setUserInput] = useState("")
+  const [input, setInput] = useState("")
+  const [template, setTemplate] = useState("fps")
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // ---------------- GENERATE UNITY FILES ----------------
-  const handleGenerate = async () => {
+  const generate = async () => {
     setLoading(true)
 
-    try {
-      const res = await fetch(`${API_URL}/generate-unity`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: userInput
-        })
+    const res = await fetch(`${API}/generate-unity`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: input,
+        template: template
       })
+    })
 
-      const data = await res.json()
-      setResult(data)
-    } catch (err) {
-      setResult({ error: "Generation failed" })
-    }
+    const data = await res.json()
+    setResult(data)
 
     setLoading(false)
   }
 
-  // ---------------- DOWNLOAD ZIP ----------------
-  const downloadZip = async () => {
-    try {
-      const res = await fetch(`${API_URL}/download-unity-zip`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: userInput
-        })
-      })
-
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "unity-project.zip"
-      a.click()
-
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error("ZIP download failed:", err)
-    }
-  }
-
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1>Unity AI Generator 🚀</h1>
+      <h1>🎮 AI Game Builder</h1>
+
+      {/* TEMPLATE SELECTOR */}
+      <select
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+        style={{ padding: 10, marginTop: 10 }}
+      >
+        <option value="fps">FPS Shooter</option>
+        <option value="runner">Endless Runner</option>
+        <option value="rpg">RPG Game</option>
+      </select>
 
       <textarea
-        rows={5}
+        rows={4}
         style={{ width: "100%", marginTop: 10 }}
         placeholder="Describe your game..."
-        value={userInput}
-        onChange={(e) => setUserInput(e.target.value)}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
       />
 
-      <div style={{ marginTop: 10 }}>
-        <button onClick={handleGenerate}>
-          {loading ? "Generating..." : "Generate Unity Code"}
-        </button>
+      <button onClick={generate} style={{ marginTop: 10 }}>
+        {loading ? "Generating..." : "Generate Game"}
+      </button>
 
-        <button onClick={downloadZip} style={{ marginLeft: 10 }}>
-          Download ZIP 📦
-        </button>
-      </div>
-
-      {/* RESULTS */}
+      {/* OUTPUT */}
       {result && (
         <div style={{ marginTop: 20 }}>
-          <h2>Result</h2>
+          <h2>Result ({result.project})</h2>
 
-          {result.files &&
-            result.files.map((file, i) => (
-              <div key={i} style={{ marginBottom: 15 }}>
-                <h3>{file.name}</h3>
-                <pre style={{ background: "#111", color: "#0f0", padding: 10 }}>
-                  {file.content}
-                </pre>
-              </div>
-            ))}
-
-          {result.error && <p style={{ color: "red" }}>{result.error}</p>}
+          {result.files?.map((file, i) => (
+            <div key={i}>
+              <h3>{file.name}</h3>
+              <pre style={{ background: "#111", color: "#0f0", padding: 10 }}>
+                {file.content}
+              </pre>
+            </div>
+          ))}
         </div>
       )}
     </div>

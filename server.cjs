@@ -112,4 +112,89 @@ public class GameManager : MonoBehaviour {
 // ---------------- START SERVER ----------------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
+})app.post("/generate-unity", async (req, res) => {
+  const { prompt, template } = req.body
+
+  try {
+    let systemPrompt = ""
+
+    if (template === "fps") {
+      systemPrompt = `
+You are a Unity FPS game developer.
+Generate scripts for a FIRST PERSON SHOOTER game.
+Include:
+- Player movement
+- Gun shooting system
+- Simple enemy AI
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "PlayerController.cs", "content": "..." },
+    { "name": "Gun.cs", "content": "..." },
+    { "name": "EnemyAI.cs", "content": "..." }
+  ]
+}
+`
+    }
+
+    if (template === "runner") {
+      systemPrompt = `
+You are a Unity endless runner developer.
+Include:
+- auto forward movement
+- jump system
+- obstacle system
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "PlayerController.cs", "content": "..." },
+    { "name": "GameManager.cs", "content": "..." }
+  ]
+}
+`
+    }
+
+    if (template === "rpg") {
+      systemPrompt = `
+You are a Unity RPG developer.
+Include:
+- player movement
+- health system
+- enemy combat system
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "Player.cs", "content": "..." },
+    { "name": "Combat.cs", "content": "..." }
+  ]
+}
+`
+    }
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt || "Generate Unity game code in JSON format only."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    })
+
+    const text = response.choices[0].message.content
+    const json = JSON.parse(text)
+
+    res.json({
+      project: template || "custom",
+      files: json.files
+    })
+
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "AI generation failed" })
+  }
 })
