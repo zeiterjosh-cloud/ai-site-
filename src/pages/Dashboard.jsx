@@ -1,98 +1,105 @@
 import { useState } from "react"
-import Sidebar from "../components/Sidebar"
-import Card from "../components/Card"
+
+const API_URL = "https://ai-site-atz0.onrender.com"
 
 export default function Dashboard() {
-  const [prompt, setPrompt] = useState("")
+  const [userInput, setUserInput] = useState("")
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const generateUnity = async () => {
-    if (!prompt) return
+  const handleGenerate = async () => {
+    if (!userInput.trim()) return
 
     setLoading(true)
     setResult(null)
 
     try {
-      const res = await fetch("https://ai-site-atz0.onrender.com/generate-unity",
+      const res = await fetch(`${API_URL}/generate-unity`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({
+          prompt: userInput
+        })
       })
 
+      // 🚨 check backend errors properly
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`)
+      }
+
       const data = await res.json()
-      setResult(data.result)
+      console.log("Backend response:", data)
+
+      setResult(data)
     } catch (err) {
-      console.error(err)
+      console.error("Error calling backend:", err)
+      setResult({
+        error: "Backend connection failed. Check Render URL or route."
+      })
     }
 
     setLoading(false)
   }
 
   return (
-    <div style={styles.app}>
-      <Sidebar />
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h1>Unity AI Generator 🚀</h1>
 
-      <div style={styles.main}>
-        <h1>AI Unity Game Builder</h1>
+      <textarea
+        value={userInput}
+        onChange={(e) => setUserInput(e.target.value)}
+        placeholder="Describe your game..."
+        rows={6}
+        style={{
+          width: "100%",
+          marginTop: "10px",
+          padding: "10px"
+        }}
+      />
 
-        <div style={styles.generator}>
-          <input
-            placeholder="Describe your game..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            style={styles.input}
-          />
+      <button
+        onClick={handleGenerate}
+        style={{
+          marginTop: "10px",
+          padding: "10px 20px",
+          cursor: "pointer"
+        }}
+      >
+        {loading ? "Generating..." : "Generate Unity Project"}
+      </button>
 
-          <button onClick={generateUnity} style={styles.button}>
-            Generate
-          </button>
+      {/* RESULT SECTION */}
+      {result && (
+        <div style={{ marginTop: "20px" }}>
+          <h2>Result:</h2>
+
+          {result.error && (
+            <p style={{ color: "red" }}>{result.error}</p>
+          )}
+
+          {result.files?.map((file, index) => (
+            <div key={index} style={{ marginBottom: "15px" }}>
+              <h3>{file.name}</h3>
+              <pre
+                style={{
+                  background: "#111",
+                  color: "#0f0",
+                  padding: "10px",
+                  overflowX: "auto"
+                }}
+              >
+                {file.content}
+              </pre>
+            </div>
+          ))}
+
+          {!result.files && !result.error && (
+            <pre>{JSON.stringify(result, null, 2)}</pre>
+          )}
         </div>
-
-        {loading && <p>Generating...</p>}
-
-        {result && (
-          <div style={styles.result}>
-            <h2>{result.projectName}</h2>
-
-            <h3>Folder Structure</h3>
-            <pre>{result.folderStructure}</pre>
-
-            <h3>Instructions</h3>
-            <ul>
-              {result.instructions.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-
-            <h3>Scripts</h3>
-            {Object.entries(result.scripts).map(([name, code]) => (
-              <div key={name}>
-                <h4>{name}.cs</h4>
-                <pre>{code}</pre>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={styles.grid}>
-          <Card title="Create Project" desc="Build apps instantly" />
-          <Card title="AI Tools" desc="Generate ideas & code" />
-          <Card title="Unity Mode" desc="Game builder system" />
-        </div>
-      </div>
+      )}
     </div>
   )
-}
-
-const styles = {
-  app: { display: "flex", height: "100vh", background: "#0d0d0d", color: "white" },
-  main: { flex: 1, padding: "30px" },
-  generator: { marginBottom: "20px" },
-  input: { padding: "10px", width: "250px" },
-  button: { padding: "10px", marginLeft: "10px" },
-  result: { background: "#111", padding: "20px", marginTop: "20px" },
-  grid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "20px" }
 }

@@ -1,5 +1,8 @@
 const express = require("express")
 const cors = require("cors")
+const fs = require("fs")
+const path = require("path")
+const archiver = require("archiver")
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -7,17 +10,20 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 
-// -------------------- ROOT --------------------
+// ---------------- ROOT ----------------
 app.get("/", (req, res) => {
   res.send("Backend is live 🚀")
 })
 
-// -------------------- TEST --------------------
+// ---------------- TEST ----------------
 app.get("/test", (req, res) => {
-  res.json({ status: "ok", message: "TEST WORKS 🚀" })
+  res.json({
+    status: "ok",
+    message: "TEST WORKS 🚀"
+  })
 })
 
-// -------------------- AI GENERATOR --------------------
+// ---------------- BASIC AI ----------------
 app.post("/generate", (req, res) => {
   const { prompt } = req.body
 
@@ -26,7 +32,7 @@ app.post("/generate", (req, res) => {
   })
 })
 
-// -------------------- UNITY GENERATOR --------------------
+// ---------------- UNITY GENERATOR ----------------
 app.post("/generate-unity", (req, res) => {
   const { prompt } = req.body
 
@@ -39,7 +45,17 @@ app.post("/generate-unity", (req, res) => {
 
 public class PlayerController : MonoBehaviour {
     void Update() {
-        Debug.Log("AI: ${prompt}");
+        Debug.Log("AI Prompt: ${prompt}");
+    }
+}`
+      },
+      {
+        name: "GameManager.cs",
+        content: `using UnityEngine;
+
+public class GameManager : MonoBehaviour {
+    void Start() {
+        Debug.Log("Game started from AI generator");
     }
 }`
       }
@@ -47,59 +63,52 @@ public class PlayerController : MonoBehaviour {
   })
 })
 
-// -------------------- START SERVER --------------------
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})const express = require("express")
-const cors = require("cors")
-
-const app = express()
-const PORT = process.env.PORT || 5000
-
-app.use(cors())
-app.use(express.json())
-
-// -------------------- ROOT --------------------
-app.get("/", (req, res) => {
-  res.send("Backend is live 🚀")
-})
-
-// -------------------- TEST --------------------
-app.get("/test", (req, res) => {
-  res.json({ status: "ok", message: "TEST WORKS 🚀" })
-})
-
-// -------------------- AI GENERATOR --------------------
-app.post("/generate", (req, res) => {
+// ---------------- ZIP DOWNLOAD (OPTIONAL NEXT STEP) ----------------
+app.post("/download-unity-zip", (req, res) => {
   const { prompt } = req.body
 
-  res.json({
-    result: `AI Idea for: ${prompt}`
-  })
-})
+  const tempDir = path.join(__dirname, "tempProject")
+  const assetsDir = path.join(tempDir, "Assets")
 
-// -------------------- UNITY GENERATOR --------------------
-app.post("/generate-unity", (req, res) => {
-  const { prompt } = req.body
+  fs.mkdirSync(assetsDir, { recursive: true })
 
-  res.json({
-    project: "Unity Game",
-    files: [
-      {
-        name: "PlayerController.cs",
-        content: `using UnityEngine;
+  const playerScript = `
+using UnityEngine;
 
 public class PlayerController : MonoBehaviour {
     void Update() {
-        Debug.Log("AI: ${prompt}");
+        Debug.Log("AI Generated: ${prompt}");
     }
-}`
-      }
-    ]
+}
+`
+
+  const gameManager = `
+using UnityEngine;
+
+public class GameManager : MonoBehaviour {
+    void Start() {
+        Debug.Log("Game started from AI generator");
+    }
+}
+`
+
+  fs.writeFileSync(path.join(assetsDir, "PlayerController.cs"), playerScript)
+  fs.writeFileSync(path.join(assetsDir, "GameManager.cs"), gameManager)
+
+  const zipPath = path.join(__dirname, "unity-project.zip")
+  const output = fs.createWriteStream(zipPath)
+  const archive = archiver("zip")
+
+  output.on("close", () => {
+    res.download(zipPath)
   })
+
+  archive.pipe(output)
+  archive.directory(tempDir, false)
+  archive.finalize()
 })
 
-// -------------------- START SERVER --------------------
+// ---------------- START SERVER ----------------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
