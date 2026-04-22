@@ -1,26 +1,29 @@
-const express = require("express")
-const cors = require("cors")
+app.post("/generate-unity", (req, res) => {
+  const { prompt } = req.body
 
-const app = express()
-
-app.use(cors())
-app.use(express.json())
-
-// ROOT
-app.get("/", (req, res) => {
-  res.send("Backend is live 🚀")
-})
-
-// TEST ROUTE (THIS MUST EXIST)
-app.get("/test", (req, res) => {
   res.json({
-    status: "ok",
-    message: "TEST WORKS 🚀"
+    project: "Unity Game",
+    files: [
+      {
+        name: "PlayerController.cs",
+        content: `using UnityEngine;
+
+public class PlayerController : MonoBehaviour {
+    void Update() {
+        Debug.Log("AI Prompt: ${prompt}");
+    }
+}`
+      },
+      {
+        name: "GameManager.cs",
+        content: `using UnityEngine;
+
+public class GameManager : MonoBehaviour {
+    void Start() {
+        Debug.Log("Game started from AI generator");
+    }
+}`
+      }
+    ]
   })
-})
-
-const PORT = process.env.PORT || 5000
-
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT)
 })

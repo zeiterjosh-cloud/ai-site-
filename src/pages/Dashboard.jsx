@@ -14,7 +14,7 @@ export default function Dashboard() {
     setResult(null)
 
     try {
-      const res = await fetch("http://localhost:5000/generate-unity", {
+      const res = await fetch("https://ai-site-atz0.onrender.com/generate-unity",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
