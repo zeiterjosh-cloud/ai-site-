@@ -1,73 +1,165 @@
-import { useState } from "react"
+require("dotenv").config()
 
-const API = "https://ai-site-atz0.onrender.com"
+const express = require("express")
+const cors = require("cors")
+const fs = require("fs")
+const path = require("path")
+const os = require("os")
+const archiver = require("archiver")
+const OpenAI = require("openai")
 
-export default function Dashboard() {
-  const [input, setInput] = useState("")
-  const [template, setTemplate] = useState("fps")
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
+const app = express()
+const PORT = process.env.PORT || 5000
 
-  const generate = async () => {
-    setLoading(true)
+app.use(cors())
+app.use(express.json())
 
-    const res = await fetch(`${API}/generate-unity`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: input,
-        template: template
-      })
+// ---------------- OPENAI ----------------
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+// ---------------- ROOT ----------------
+app.get("/", (req, res) => {
+  res.send("Backend is live 🚀")
+})
+
+// ---------------- TEST ----------------
+app.get("/test", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "TEST WORKS 🚀"
+  })
+})
+
+// ---------------- AI UNITY GENERATOR (TEMPLATES) ----------------
+app.post("/generate-unity", async (req, res) => {
+  const { prompt, template } = req.body
+
+  try {
+    let systemPrompt = ""
+
+    if (template === "fps") {
+      systemPrompt = `
+You are a Unity FPS game developer.
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "PlayerController.cs", "content": "C# code" },
+    { "name": "Gun.cs", "content": "C# code" },
+    { "name": "EnemyAI.cs", "content": "C# code" }
+  ]
+}
+`
+    }
+
+    if (template === "runner") {
+      systemPrompt = `
+You are a Unity endless runner developer.
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "PlayerController.cs", "content": "C# code" },
+    { "name": "GameManager.cs", "content": "C# code" }
+  ]
+}
+`
+    }
+
+    if (template === "rpg") {
+      systemPrompt = `
+You are a Unity RPG developer.
+Return ONLY JSON:
+{
+  "files": [
+    { "name": "Player.cs", "content": "C# code" },
+    { "name": "Combat.cs", "content": "C# code" }
+  ]
+}
+`
+    }
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt || "Generate Unity game code in JSON format only."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
     })
 
-    const data = await res.json()
-    setResult(data)
+    const text = response.choices[0].message.content
+    const json = JSON.parse(text)
 
-    setLoading(false)
+    res.json({
+      project: template || "custom",
+      files: json.files
+    })
+
+  } catch (err) {
+    console.error("AI ERROR:", err)
+    res.status(500).json({ error: "AI generation failed" })
   }
+})
 
-  return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1>🎮 AI Game Builder</h1>
+// ---------------- ZIP DOWNLOAD ----------------
+app.post("/download-unity-zip", (req, res) => {
+  const { prompt } = req.body
 
-      {/* TEMPLATE SELECTOR */}
-      <select
-        value={template}
-        onChange={(e) => setTemplate(e.target.value)}
-        style={{ padding: 10, marginTop: 10 }}
-      >
-        <option value="fps">FPS Shooter</option>
-        <option value="runner">Endless Runner</option>
-        <option value="rpg">RPG Game</option>
-      </select>
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "unity-"))
+  const assetsDir = path.join(tempDir, "Assets")
 
-      <textarea
-        rows={4}
-        style={{ width: "100%", marginTop: 10 }}
-        placeholder="Describe your game..."
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
+  fs.mkdirSync(assetsDir, { recursive: true })
 
-      <button onClick={generate} style={{ marginTop: 10 }}>
-        {loading ? "Generating..." : "Generate Game"}
-      </button>
+  const player = `
+using UnityEngine;
 
-      {/* OUTPUT */}
-      {result && (
-        <div style={{ marginTop: 20 }}>
-          <h2>Result ({result.project})</h2>
-
-          {result.files?.map((file, i) => (
-            <div key={i}>
-              <h3>{file.name}</h3>
-              <pre style={{ background: "#111", color: "#0f0", padding: 10 }}>
-                {file.content}
-              </pre>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+public class PlayerController : MonoBehaviour {
+    void Update() {
+        Debug.Log("AI: ${prompt}");
+    }
 }
+`
+
+  const manager = `
+using UnityEngine;
+
+public class GameManager : MonoBehaviour {
+    void Start() {
+        Debug.Log("Game started");
+    }
+}
+`
+
+  fs.writeFileSync(path.join(assetsDir, "PlayerController.cs"), player)
+  fs.writeFileSync(path.join(assetsDir, "GameManager.cs"), manager)
+
+  const zipPath = path.join(tempDir, "game.zip")
+  const output = fs.createWriteStream(zipPath)
+  const archive = archiver("zip", { zlib: { level: 9 } })
+
+  output.on("close", () => {
+    res.download(zipPath, "unity-game.zip", () => {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    })
+  })
+
+  archive.on("error", (err) => {
+    console.error(err)
+    res.status(500).send("ZIP error")
+  })
+
+  archive.pipe(output)
+  archive.directory(tempDir, false)
+  archive.finalize()
+})
+
+// ---------------- START SERVER ----------------
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
