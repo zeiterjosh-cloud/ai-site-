@@ -3,27 +3,24 @@ const cors = require("cors")
 
 const app = express()
 
-// Middleware
 app.use(cors())
 app.use(express.json())
 
-// Test route (checks if backend is alive)
+// ROOT
 app.get("/", (req, res) => {
   res.send("Backend is live 🚀")
 })
 
-// AI / generator route (placeholder for now)
-app.post("/generate", (req, res) => {
-  const { prompt } = req.body
-
+// TEST ROUTE (THIS MUST EXIST)
+app.get("/test", (req, res) => {
   res.json({
-    result: `Generated output for: ${prompt}`
+    status: "ok",
+    message: "TEST WORKS 🚀"
   })
 })
 
-// Port setup (IMPORTANT for Render)
 const PORT = process.env.PORT || 5000
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+  console.log("Server running on port", PORT)
 })
